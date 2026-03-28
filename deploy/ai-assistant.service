@@ -1,0 +1,29 @@
+[Unit]
+Description=AI Coding Assistant FastAPI Server
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=aiuser
+Group=aiuser
+WorkingDirectory=/home/aiuser/ai-coding-assistant
+Environment="PATH=/home/aiuser/ai-coding-assistant/venv/bin"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/aiuser/ai-coding-assistant/venv/bin/python web_server.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-assistant
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/aiuser/ai-coding-assistant/data
+ReadWritePaths=/home/aiuser/ai-coding-assistant/logs
+
+[Install]
+WantedBy=multi-user.target

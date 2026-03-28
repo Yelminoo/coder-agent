@@ -1,0 +1,1421 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Coding Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/theme.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+    <style>
+        @keyframes wave-pulse {
+            0%, 100% { 
+                transform: scale(0.8); 
+                opacity: 0.4; 
+            }
+            50% { 
+                transform: scale(2); 
+                opacity: 1; 
+            }
+        }
+        .wave {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.8), rgba(147, 51, 234, 0.5));
+            position: absolute;
+            animation: wave-pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+        @keyframes spinner {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spinner 0.8s linear infinite;
+        }
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 1), 0 0 30px rgba(147, 51, 234, 0.8); }
+        }
+        .animate-glow {
+            animation: glow 2s ease-in-out infinite;
+        }
+        
+        /* Mobile responsive styles */
+        @media (max-width: 768px) {
+            body { padding: 1rem !important; }
+            .max-w-5xl { max-width: 100%; }
+            h1 { font-size: 1.5rem !important; }
+            .grid { grid-template-columns: 1fr !important; }
+            .flex { flex-wrap: wrap; }
+            .gap-3, .gap-4 { gap: 0.5rem !important; }
+            select, button, input { font-size: 14px !important; }
+            textarea { font-size: 14px !important; min-height: 100px; }
+            .hidden-mobile { display: none !important; }
+        }
+        
+        @keyframes pulse-border {
+            0%, 100% { border-color: #3b82f6; }
+            50% { border-color: #8b5cf6; }
+        }
+        .url-detected {
+            animation: pulse-border 2s ease-in-out infinite;
+            border: 2px solid #3b82f6 !important;
+        }
+    </style>
+</head>
+<body class="p-8">
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2 w-80 md:w-96"></div>
+    <div class="max-w-5xl mx-auto">
+        <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
+            <h1 class="text-2xl md:text-3xl font-bold theme-text">🤖 AI Coding Assistant</h1>
+            <div class="flex flex-wrap items-center gap-2 md:gap-3">
+                <label for="ui-mode" class="text-sm font-semibold theme-text">UI Mode</label>
+                <select id="ui-mode" class="clay-button px-3 py-1 text-sm">
+                    <option value="clay">Clay</option>
+                    <option value="liquid">Liquid</option>
+                    <option value="glass">Glass</option>
+                    <option value="skeuomorphic">Skeuomorphic</option>
+                </select>
+                
+                {% if is_local %}
+                <label for="ollama-model" class="text-sm font-semibold theme-text ml-2">Model</label>
+                <select id="ollama-model" class="clay-button px-3 py-1 text-sm">
+                    <option value="loading">Loading...</option>
+                </select>
+                {% endif %}
+            </div>
+            {% if current_user %}
+            <div class="flex items-center gap-2">
+                <span class="clay px-3 py-1 text-sm">👤 {{ current_user.name }}</span>
+                <a href="/auth/logout" class="clay-button px-3 py-1 text-sm font-semibold">Logout</a>
+            </div>
+            {% else %}
+            <a href="/auth/github/login" class="clay-button px-3 py-1 text-sm font-semibold">GitHub Sign Up / Login</a>
+            {% endif %}
+            <span class="clay px-3 py-1 text-sm">
+                Active: <span class="theme-accent font-bold">{{ current_provider }}</span>
+                {% if is_local %} (Local) {% else %} (Cloud) {% endif %}
+            </span>
+        </div>
+
+        <div class="clay p-3 mb-4 flex flex-wrap items-center gap-2 md:gap-3">
+            <label for="chat-id" class="text-sm font-semibold theme-text">Chat</label>
+            <select id="chat-id" class="clay-button px-2 md:px-3 py-1 text-xs md:text-sm flex-1 md:flex-initial"></select>
+            <button id="new-chat" class="clay-button px-2 md:px-3 py-1 text-xs md:text-sm font-semibold">+ New</button>
+            <button id="rename-chat" class="clay-button px-2 md:px-3 py-1 text-xs md:text-sm font-semibold hidden-mobile">Rename</button>
+            <button id="delete-chat" class="clay-button px-2 md:px-3 py-1 text-xs md:text-sm font-semibold">Delete</button>
+        </div>
+
+        <div class="clay p-4 mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-base font-bold theme-accent">🗄️ DB Status & Export</h2>
+                <div class="flex gap-2">
+                    <button id="export-training" class="clay-button px-3 py-1 text-xs font-semibold">📥 Export for Training</button>
+                    <button id="refresh-db" class="clay-button px-3 py-1 text-xs font-semibold">Refresh</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm theme-text">
+                <div><strong>Backend:</strong> <span id="db-backend">-</span></div>
+                <div><strong>Chats:</strong> <span id="db-chats">-</span></div>
+                <div><strong>Messages:</strong> <span id="db-messages">-</span></div>
+                <div><strong>Path:</strong> <span id="db-path" class="theme-muted">-</span></div>
+            </div>
+            <div class="mt-2 text-xs theme-muted">
+                💡 <strong>Tip:</strong> Export your conversations to train a custom Ollama model with your chat history
+            </div>
+        </div>
+
+        <!-- Ollama Monitoring Panel -->
+        <div class="clay p-4 mb-4" {% if not is_local %}style="display:none;"{% endif %} id="ollama-monitor">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-bold theme-accent">🤖 Ollama Model Monitor</h2>
+                <div class="flex items-center gap-2">
+                    <span id="ollama-status-badge" class="px-2 py-1 text-xs font-semibold rounded">Checking...</span>
+                    <button id="test-animation" class="clay-button px-3 py-1 text-xs font-semibold">🔬 Test Animation</button>
+                    <button id="refresh-ollama" class="clay-button px-3 py-1 text-xs font-semibold">Refresh</button>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                <div class="clay-inset p-3">
+                    <div class="text-xs theme-muted mb-1">Connection Status</div>
+                    <div class="flex items-center gap-2">
+                        <div id="connection-indicator" class="w-3 h-3 rounded-full bg-gray-400"></div>
+                        <span id="connection-text" class="text-sm font-semibold theme-text">Checking...</span>
+                    </div>
+                </div>
+                
+                <div class="clay-inset p-3">
+                    <div class="text-xs theme-muted mb-1">Active Model</div>
+                    <div class="text-sm font-semibold theme-text" id="ollama-model-display">-</div>
+                </div>
+                
+                <div class="clay-inset p-3">
+                    <div class="text-xs theme-muted mb-1">Hardware</div>
+                    <div class="text-sm font-semibold theme-text" id="ollama-gpu">-</div>
+                </div>
+                
+                <div class="clay-inset p-3">
+                    <div class="text-xs theme-muted mb-1">Last Response Time</div>
+                    <div class="text-sm font-semibold theme-text" id="last-response-time">-</div>
+                </div>
+            </div>
+            
+            <div class="clay-inset p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-xs theme-muted">Processing Activity</div>
+                    <div id="processing-status" class="text-xs font-semibold theme-accent" style="display:none;">⚡ Processing...</div>
+                </div>
+                
+                <div class="relative h-20 bg-gray-100 rounded overflow-hidden">
+                    <div id="processing-bar" class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 transition-all duration-500 animate-glow" style="width: 0%;"></div>
+                    <div id="processing-waves" class="absolute inset-0 flex items-center justify-center gap-3" style="display:none;">
+                        <div class="wave"></div>
+                        <div class="wave" style="animation-delay: 0.3s;"></div>
+                        <div class="wave" style="animation-delay: 0.6s;"></div>
+                    </div>
+                    <div class="absolute inset-0 flex items-center justify-center text-xs font-semibold text-gray-700">
+                        <span id="processing-text">Idle</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-3 grid grid-cols-2 gap-2 text-xs theme-muted">
+                <div><strong>Host:</strong> <span id="ollama-host">-</span></div>
+                <div><strong>Avg Response:</strong> <span id="avg-response-time">-</span></div>
+            </div>
+        </div>
+        
+        <div class="clay p-6">
+            <div class="mb-3 flex items-center gap-2 flex-wrap">
+                <label for="agent-id" class="text-sm font-semibold theme-text">Agent</label>
+                <select id="agent-id" class="clay-button px-3 py-1 text-sm">
+                    {% for agent in agents %}
+                    <option value="{{ agent.id }}" data-mode="{{ agent.mode }}" {% if agent.id == default_agent_id %}selected{% endif %}>
+                        {{ agent.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <button id="edit-agent-btn" class="clay-button px-3 py-1 text-xs">✏️ Edit Personality</button>
+                <button id="add-agent-btn" class="clay-button px-3 py-1 text-xs">➕ New Agent</button>
+            </div>
+            <div class="flex flex-wrap items-center justify-between mb-2 gap-2">
+                <label class="font-bold theme-text text-sm md:text-base">What do you want to build?</label>
+                <div id="url-indicator" class="text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-700" style="display:none;"></div>
+            </div>
+            <div id="url-info-box" class="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs theme-text" style="display:none;">
+                ℹ️ <strong>How it works:</strong> Backend fetches URL content → Extracts text → Feeds to Ollama as context
+            </div>
+            <textarea id="prompt" class="w-full p-3 clay-inset theme-text outline-none h-32 md:h-40 text-sm md:text-base" placeholder="E.g., Create a function to calculate Fibonacci numbers...\n\nTip: Paste URLs for automatic content extraction!" maxlength="50000"></textarea>
+            <div class="flex justify-between items-center mt-1">
+                <span id="char-counter" class="text-xs theme-muted">0 / 50,000</span>
+                <span id="sanitization-warning" class="text-xs text-orange-600" style="display:none;">⚠️ Special characters removed</span>
+            </div>
+            
+            <div class="mt-4 flex flex-wrap items-center gap-2 md:gap-4">
+                <label id="include-test-wrap" class="flex items-center gap-2 cursor-pointer theme-text">
+                    <input type="checkbox" id="include-test" checked class="w-4 h-4">
+                    <span class="text-xs md:text-sm">Auto-generate Tests</span>
+                </label>
+                <label id="search-mode-wrap" class="flex items-center gap-2 cursor-pointer theme-text">
+                    <input type="checkbox" id="search-mode" class="w-4 h-4">
+                    <span class="text-xs md:text-sm">Search Mode</span>
+                </label>
+
+                <span id="typing-indicator" class="theme-muted text-xs md:text-sm hidden">Typing...</span>
+                <button id="generate-btn" onclick="generate()" class="ml-auto clay-button px-4 md:px-6 py-2 font-bold text-sm md:text-base">✨ Generate</button>
+                <button id="stop-btn" class="clay-button px-3 md:px-4 py-2 font-bold hidden text-sm md:text-base">⏹ Stop</button>
+            </div>
+        </div>
+
+        <div class="clay p-4 md:p-6 mt-4">
+            <h2 class="text-base md:text-lg font-bold theme-accent mb-3">💬 Conversation Thread</h2>
+            <div id="conversation-thread" class="clay-inset p-2 md:p-3 h-60 md:h-80 overflow-y-auto space-y-2 md:space-y-3 text-sm md:text-base"></div>
+        </div>
+
+        <!-- Main Code Result -->
+        <div id="result-main" class="mt-6 hidden">
+            <h2 id="result-main-title" class="text-xl font-bold mb-2 theme-accent">✅ Generated Code</h2>
+            <pre class="clay-inset p-4 overflow-x-auto theme-text"><code id="code-output"></code></pre>
+            <button onclick="downloadCode('main')" class="mt-2 clay-button px-3 py-1 text-xs">⬇️ Download .py</button>
+        </div>
+        
+        <!-- Test Code Result -->
+        <div id="result-test" class="mt-6 hidden">
+            <h2 class="text-xl font-bold mb-2 theme-accent">🧪 Generated Test Suite</h2>
+            <pre class="clay-inset p-4 overflow-x-auto theme-text"><code id="test-output"></code></pre>
+            <div class="mt-2 flex gap-2">
+                <button onclick="downloadCode('test')" class="clay-button px-3 py-1 text-xs">⬇️ Download test_.py</button>
+                <span class="text-xs theme-muted self-center">Run with: <code class="clay-inset px-1 rounded">pytest test_filename.py</code></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mainCode = "";
+        let testCode = "";
+        const CHAT_SESSIONS_KEY = 'ai-chat-sessions-v1';
+        const ACTIVE_CHAT_KEY = 'ai-active-chat-v1';
+        const modeSelect = document.getElementById('ui-mode');
+        const agentSelect = document.getElementById('agent-id');
+        const chatSelect = document.getElementById('chat-id');
+        const newChatButton = document.getElementById('new-chat');
+        const renameChatButton = document.getElementById('rename-chat');
+        const deleteChatButton = document.getElementById('delete-chat');
+        const threadEl = document.getElementById('conversation-thread');
+        const promptInput = document.getElementById('prompt');
+        const includeTestWrap = document.getElementById('include-test-wrap');
+        const includeTestInput = document.getElementById('include-test');
+        const searchModeInput = document.getElementById('search-mode');
+        const generateBtn = document.getElementById('generate-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const resultMainTitle = document.getElementById('result-main-title');
+        const refreshDbBtn = document.getElementById('refresh-db');
+        const exportTrainingBtn = document.getElementById('export-training');
+        const dbBackendEl = document.getElementById('db-backend');
+        const dbChatsEl = document.getElementById('db-chats');
+        const dbMessagesEl = document.getElementById('db-messages');
+        const dbPathEl = document.getElementById('db-path');
+        const defaultAgentId = agentSelect.value || 'context_agent';
+        
+        // Ollama monitoring elements
+        const ollamaMonitor = document.getElementById('ollama-monitor');
+        const refreshOllamaBtn = document.getElementById('refresh-ollama');
+        const testAnimationBtn = document.getElementById('test-animation');
+        const connectionIndicator = document.getElementById('connection-indicator');
+        const connectionText = document.getElementById('connection-text');
+        const ollamaModelDisplay = document.getElementById('ollama-model-display');
+        const ollamaGpu = document.getElementById('ollama-gpu');
+        const ollamaHost = document.getElementById('ollama-host');
+        const lastResponseTime = document.getElementById('last-response-time');
+        const avgResponseTime = document.getElementById('avg-response-time');
+        const processingBar = document.getElementById('processing-bar');
+        const processingText = document.getElementById('processing-text');
+        const processingStatus = document.getElementById('processing-status');
+        const processingWaves = document.getElementById('processing-waves');
+        const ollamaStatusBadge = document.getElementById('ollama-status-badge');
+        const urlIndicator = document.getElementById('url-indicator');
+        const urlInfoBox = document.getElementById('url-info-box');
+        const ollamaModelSelect = document.getElementById('ollama-model');
+        const charCounter = document.getElementById('char-counter');
+        const sanitizationWarning = document.getElementById('sanitization-warning');
+        let responseTimes = [];
+        
+        // Input sanitization monitoring
+        function updateCharCounter() {
+            const text = promptInput.value || '';
+            const length = text.length;
+            charCounter.textContent = `${length.toLocaleString()} / 50,000`;
+            
+            // Warn if approaching limit
+            if (length > 45000) {
+                charCounter.className = 'text-xs text-red-600 font-semibold';
+            } else if (length > 40000) {
+                charCounter.className = 'text-xs text-orange-600';
+            } else {
+                charCounter.className = 'text-xs theme-muted';
+            }
+            
+            // Check for suspicious patterns
+            const hasDangerousChars = /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
+            if (hasDangerousChars) {
+                sanitizationWarning.style.display = 'block';
+            } else {
+                sanitizationWarning.style.display = 'none';
+            }
+        }
+        
+        // URL detection in prompt
+        function detectUrlsInText(text) {
+            const urlPattern = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)/g;
+            return text.match(urlPattern) || [];
+        }
+        
+        function updateUrlIndicator() {
+            const text = promptInput.value || '';
+            const urls = detectUrlsInText(text);
+            
+            if (urls.length > 0) {
+                urlIndicator.style.display = 'block';
+                urlIndicator.className = 'text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-700 animate-pulse';
+                urlIndicator.innerHTML = `🔗 ${urls.length} URL${urls.length > 1 ? 's' : ''} detected - will fetch content`;
+                promptInput.classList.add('url-detected');
+                urlInfoBox.style.display = 'block';
+                
+                // Show immediate feedback
+                console.log('✅ URL Detection Active:', urls);
+            } else {
+                urlIndicator.style.display = 'none';
+                urlInfoBox.style.display = 'none';
+                promptInput.classList.remove('url-detected');
+            }
+        }
+        let chatSessions = [];
+        let activeChatId = null;
+        let activeAbortController = null;
+
+        function showToast(message, type = 'info', duration = 3200) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const typeClass = type === 'error'
+                ? 'border-red-300 text-red-800'
+                : type === 'warning'
+                    ? 'border-amber-300 text-amber-800'
+                    : 'border-emerald-300 text-emerald-800';
+            toast.className = `clay p-3 text-sm border ${typeClass}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-4px)';
+                toast.style.transition = 'all 0.2s ease';
+            }, duration - 200);
+            setTimeout(() => toast.remove(), duration);
+        }
+
+        function makeChatId() {
+            if (window.crypto && crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+            return `chat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        }
+
+        function loadChatSessions() {
+            try {
+                const raw = localStorage.getItem(CHAT_SESSIONS_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function saveChatSessions() {
+            localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(chatSessions));
+            localStorage.setItem(ACTIVE_CHAT_KEY, activeChatId || '');
+        }
+
+        function createChat(name = null, agentId = defaultAgentId) {
+            const label = name || `Chat ${chatSessions.length + 1}`;
+            return { id: makeChatId(), name: label, agent_id: agentId };
+        }
+
+        function getActiveChat() {
+            return chatSessions.find((item) => item.id === activeChatId) || null;
+        }
+
+        function renderChatOptions() {
+            chatSelect.innerHTML = '';
+            chatSessions.forEach((chat) => {
+                const option = document.createElement('option');
+                option.value = chat.id;
+                option.textContent = chat.name;
+                if (chat.id === activeChatId) {
+                    option.selected = true;
+                }
+                chatSelect.appendChild(option);
+            });
+        }
+
+        function syncAgentForActiveChat() {
+            const active = getActiveChat();
+            if (!active) return;
+            const desired = active.agent_id || defaultAgentId;
+            if ([...agentSelect.options].some((opt) => opt.value === desired)) {
+                agentSelect.value = desired;
+            } else {
+                agentSelect.value = defaultAgentId;
+                active.agent_id = defaultAgentId;
+                saveChatSessions();
+                showToast('Selected agent was unavailable. Reverted to default agent.', 'warning');
+            }
+        }
+
+        function initializeChats() {
+            chatSessions = loadChatSessions();
+            if (!chatSessions.length) {
+                chatSessions = [createChat('Chat 1', defaultAgentId)];
+            }
+
+            const storedActive = localStorage.getItem(ACTIVE_CHAT_KEY);
+            const hasStored = storedActive && chatSessions.some((item) => item.id === storedActive);
+            activeChatId = hasStored ? storedActive : chatSessions[0].id;
+
+            renderChatOptions();
+            syncAgentForActiveChat();
+            saveChatSessions();
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;');
+                // Note: Apostrophes (') don't need escaping in HTML content (only in unquoted attributes)
+        }
+
+        function renderThread(turns) {
+            if (!turns || !turns.length) {
+                threadEl.innerHTML = '<p class="theme-muted text-sm">Start a message to begin this conversation.</p>';
+                return;
+            }
+
+            const blocks = turns.map((turn) => {
+                const user = escapeHtml(turn.user || '');
+                const assistant = escapeHtml(turn.assistant || '');
+                const timestamp = formatTimestamp(turn.created_at);
+                return `
+                    <div class="space-y-2">
+                        <div class="clay-button p-3 text-sm theme-text"><strong>You:</strong><br>${user.replace(/\n/g, '<br>')}<div class="text-xs theme-muted mt-2">${timestamp}</div></div>
+                        <div class="clay assistant-reply p-3 text-sm theme-text"><strong>Assistant:</strong><br>${assistant.replace(/\n/g, '<br>')}<div class="text-xs theme-muted mt-2">${timestamp}</div></div>
+                    </div>
+                `;
+            });
+
+            threadEl.innerHTML = blocks.join('');
+            threadEl.scrollTop = threadEl.scrollHeight;
+        }
+
+        function formatTimestamp(value) {
+            if (!value) return 'Just now';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return 'Just now';
+            return date.toLocaleString();
+        }
+
+        function appendTurn(turn) {
+            const user = escapeHtml(turn.user || '');
+            const assistant = escapeHtml(turn.assistant || '');
+            const timestamp = formatTimestamp(turn.created_at);
+            const emptyState = threadEl.querySelector('p.theme-muted');
+            if (emptyState) {
+                threadEl.innerHTML = '';
+            }
+            const block = document.createElement('div');
+            block.className = 'space-y-2';
+            block.innerHTML = `
+                <div class="clay-button p-3 text-sm theme-text"><strong>You:</strong><br>${user.replace(/\n/g, '<br>')}<div class="text-xs theme-muted mt-2">${timestamp}</div></div>
+                <div class="clay assistant-reply p-3 text-sm theme-text"><strong>Assistant:</strong><br><span class="assistant-live"></span><div class="text-xs theme-muted mt-2">${timestamp}</div></div>
+            `;
+            threadEl.appendChild(block);
+            threadEl.scrollTop = threadEl.scrollHeight;
+            const assistantSpan = block.querySelector('.assistant-live');
+            typeText(assistantSpan, assistant);
+        }
+
+        function typeText(element, text) {
+            const safe = String(text || '');
+            let index = 0;
+            const step = () => {
+                if (index >= safe.length) {
+                    return;
+                }
+                const chunk = safe.slice(0, index + 2);
+                element.innerHTML = escapeHtml(chunk).replace(/\n/g, '<br>');
+                index += 2;
+                threadEl.scrollTop = threadEl.scrollHeight;
+                requestAnimationFrame(step);
+            };
+            step();
+        }
+
+        async function parseSseResponse(response, onMessage) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            function processEventBlock(block) {
+                if (!block) return;
+                const normalized = block.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                const lines = normalized.split('\n');
+                const dataLines = [];
+                for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                        dataLines.push(line.slice(5).trimStart());
+                    }
+                }
+                if (!dataLines.length) return;
+                const raw = dataLines.join('\n');
+                try {
+                    const payload = JSON.parse(raw);
+                    onMessage(payload);
+                } catch (_) {
+                }
+            }
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                buffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+                const events = buffer.split('\n\n');
+                buffer = events.pop() || '';
+
+                for (const event of events) {
+                    processEventBlock(event);
+                }
+            }
+
+            const flushed = decoder.decode();
+            if (flushed) {
+                buffer += flushed;
+            }
+            processEventBlock(buffer.trim());
+        }
+
+        async function loadChatHistory(chatId) {
+            if (!chatId) {
+                renderThread([]);
+                return;
+            }
+
+            try {
+                threadEl.innerHTML = '<p class="theme-muted text-sm">Loading conversation…</p>';
+                const response = await fetch(`/api/chats/${encodeURIComponent(chatId)}/history`);
+                if (!response.ok) {
+                    throw new Error('Failed to load history');
+                }
+                const payload = await response.json();
+                renderThread(payload.turns || []);
+            } catch (error) {
+                threadEl.innerHTML = '<p class="theme-muted text-sm">Unable to load conversation history for this chat.</p>';
+            }
+        }
+
+        function applyTheme(theme) {
+            const normalized = ["clay", "liquid", "glass", "skeuomorphic"].includes(theme) ? theme : "clay";
+            if (normalized === "clay") {
+                document.body.removeAttribute("data-theme");
+            } else {
+                document.body.setAttribute("data-theme", normalized);
+            }
+            localStorage.setItem("ui-mode", normalized);
+        }
+
+        function getSelectedAgentMode() {
+            const option = agentSelect.options[agentSelect.selectedIndex];
+            if (!option) return 'contextual';
+            return option.dataset.mode || 'contextual';
+        }
+
+        function applyAgentUiState() {
+            const mode = getSelectedAgentMode();
+            const codingMode = mode === 'code-first';
+            includeTestWrap.style.display = codingMode ? 'flex' : 'none';
+            if (!codingMode) {
+                includeTestInput.checked = false;
+                generateBtn.innerText = '💬 Send Message';
+                resultMainTitle.innerText = '💬 Assistant Reply';
+            } else {
+                generateBtn.innerText = '✨ Generate & Test';
+                resultMainTitle.innerText = '✅ Generated Code';
+            }
+        }
+
+        function setGeneratingState(isGenerating) {
+            generateBtn.disabled = isGenerating;
+            if (isGenerating) {
+                stopBtn.classList.remove('hidden');
+                typingIndicator.classList.remove('hidden');
+            } else {
+                stopBtn.classList.add('hidden');
+                typingIndicator.classList.add('hidden');
+            }
+        }
+
+        async function loadDbStatus() {
+            try {
+                const response = await fetch('/api/db/status');
+                if (!response.ok) {
+                    throw new Error('DB status request failed');
+                }
+                const data = await response.json();
+                dbBackendEl.textContent = data.backend || '-';
+                dbChatsEl.textContent = String(data.chat_count ?? '-');
+                dbMessagesEl.textContent = String(data.message_count ?? '-');
+                dbPathEl.textContent = data.db_path || data.file_path || '-';
+            } catch (_) {
+                dbBackendEl.textContent = 'Unavailable';
+                dbChatsEl.textContent = '-';
+                dbMessagesEl.textContent = '-';
+                dbPathEl.textContent = 'Unable to read DB status';
+            }
+        }
+        
+        async function loadOllamaStatus() {
+            try {
+                const response = await fetch('/api/ollama/status');
+                if (!response.ok) {
+                    throw new Error('Ollama status request failed');
+                }
+                const data = await response.json();
+                
+                // Update connection status
+                if (data.connected) {
+                    connectionIndicator.className = 'w-3 h-3 rounded-full bg-green-500 animate-pulse';
+                    connectionText.textContent = 'Connected';
+                    connectionText.className = 'text-sm font-semibold text-green-600';
+                    ollamaStatusBadge.textContent = '✓ Online';
+                    ollamaStatusBadge.className = 'px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700';
+                } else {
+                    connectionIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                    connectionText.textContent = 'Disconnected';
+                    connectionText.className = 'text-sm font-semibold text-red-600';
+                    ollamaStatusBadge.textContent = '✗ Offline';
+                    ollamaStatusBadge.className = 'px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-700';
+                }
+                
+                ollamaModelDisplay.textContent = data.model || '-';
+                
+                // Update GPU status
+                if (data.gpu && data.gpu.available) {
+                    ollamaGpu.textContent = `🎮 ${data.gpu.name || 'GPU'}`;
+                    ollamaGpu.className = 'text-sm font-semibold text-green-600';
+                } else {
+                    ollamaGpu.textContent = '🖥️ CPU Only';
+                    ollamaGpu.className = 'text-sm text-orange-600';
+                }
+                
+                ollamaHost.textContent = data.host || '-';
+                lastResponseTime.textContent = data.last_response_time ? `${data.last_response_time.toFixed(2)}s` : '-';
+                avgResponseTime.textContent = data.avg_response_time ? `${data.avg_response_time.toFixed(2)}s` : '-';
+                
+            } catch (err) {
+                connectionIndicator.className = 'w-3 h-3 rounded-full bg-gray-400';
+                connectionText.textContent = 'Error';
+                connectionText.className = 'text-sm font-semibold text-gray-600';
+                ollamaStatusBadge.textContent = '? Unknown';
+                ollamaStatusBadge.className = 'px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-700';
+            }
+        }
+        
+        async function loadOllamaModels() {
+            if (!ollamaModelSelect) return;
+            
+            try {
+                const response = await fetch('/api/ollama/models');
+                if (!response.ok) throw new Error('Failed to load models');
+                
+                const data = await response.json();
+                if (data.success && data.models) {
+                    ollamaModelSelect.innerHTML = '';
+                    
+                    data.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.name;
+                        option.textContent = model.name;
+                        if (model.name === data.current) {
+                            option.selected = true;
+                        }
+                        ollamaModelSelect.appendChild(option);
+                    });
+                    
+                    if (data.models.length === 0) {
+                        const option = document.createElement('option');
+                        option.textContent = 'No models available';
+                        ollamaModelSelect.appendChild(option);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load Ollama models:', err);
+                if (ollamaModelSelect) {
+                    ollamaModelSelect.innerHTML = '<option>Error loading models</option>';
+                }
+            }
+        }
+        
+        async function switchOllamaModel(modelName) {
+            try {
+                showToast(`Switching to ${modelName}...`, 'info');
+                const response = await fetch('/api/ollama/switch-model', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ model: modelName })
+                });
+                
+                if (!response.ok) throw new Error('Failed to switch model');
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast(`✅ Switched to ${modelName}`, 'info', 3000);
+                    loadOllamaStatus();
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            } catch (err) {
+                showToast(`Failed to switch model: ${err.message}`, 'error');
+            }
+        }
+        
+        function startProcessingAnimation() {
+            processingStatus.style.display = 'block';
+            processingWaves.style.display = 'flex';
+            processingText.textContent = 'Processing...';
+            processingBar.style.width = '100%';
+        }
+        
+        function stopProcessingAnimation() {
+            processingStatus.style.display = 'none';
+            processingWaves.style.display = 'none';
+            processingText.textContent = 'Idle';
+            processingBar.style.width = '0%';
+        }
+        
+        function updateResponseTime(duration) {
+            responseTimes.push(duration);
+            if (responseTimes.length > 10) {
+                responseTimes.shift();
+            }
+            lastResponseTime.textContent = `${duration.toFixed(2)}s`;
+            const avg = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+            avgResponseTime.textContent = `${avg.toFixed(2)}s`;
+        }
+
+        const savedMode = localStorage.getItem('ui-mode') || 'clay';
+        modeSelect.value = savedMode;
+        applyTheme(savedMode);
+        modeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
+        
+        if (ollamaModelSelect) {
+            ollamaModelSelect.addEventListener('change', (e) => {
+                const selectedModel = e.target.value;
+                if (selectedModel && selectedModel !== 'loading') {
+                    switchOllamaModel(selectedModel);
+                }
+            });
+        }
+
+        initializeChats();
+        applyAgentUiState();
+        loadChatHistory(activeChatId);
+        updateCharCounter();  // Initialize character counter
+        updateUrlIndicator(); // Initialize URL indicator
+        loadDbStatus();
+        if (ollamaMonitor && ollamaMonitor.style.display !== 'none') {
+            loadOllamaStatus();
+            loadOllamaModels();
+            setInterval(loadOllamaStatus, 5000); // Auto-refresh every 5 seconds
+        }
+
+        refreshDbBtn.addEventListener('click', loadDbStatus);
+        if (exportTrainingBtn) {
+            exportTrainingBtn.addEventListener('click', async () => {
+                const confirmed = confirm(
+                    'Export all conversations as training data?\\n\\n' +
+                    'This will download a JSONL file that you can use to fine-tune your Ollama model.\\n\\n' +
+                    'Would you like to proceed?'
+                );
+                if (!confirmed) return;
+                
+                try {
+                    showToast('Preparing training data export...', 'info');
+                    const response = await fetch('/api/chats/export/jsonl');
+                    if (!response.ok) throw new Error('Export failed');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `ollama-training-${Date.now()}.jsonl`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    showToast('Training data exported successfully!', 'info', 4000);
+                } catch (err) {
+                    showToast('Failed to export training data: ' + err.message, 'error');
+                }
+            });
+        }
+        if (refreshOllamaBtn) {
+            refreshOllamaBtn.addEventListener('click', loadOllamaStatus);
+        }
+        if (testAnimationBtn) {
+            testAnimationBtn.addEventListener('click', () => {
+                startProcessingAnimation();
+                showToast('Testing wave pulse animation for 3 seconds...', 'info');
+                setTimeout(() => {
+                    stopProcessingAnimation();
+                }, 3000);
+            });
+        }
+
+        chatSelect.addEventListener('change', (e) => {
+            activeChatId = e.target.value;
+            syncAgentForActiveChat();
+            applyAgentUiState();
+            saveChatSessions();
+            loadChatHistory(activeChatId);
+        });
+
+        newChatButton.addEventListener('click', () => {
+            const newChat = createChat(null, agentSelect.value || defaultAgentId);
+            chatSessions.push(newChat);
+            activeChatId = newChat.id;
+            renderChatOptions();
+            syncAgentForActiveChat();
+            saveChatSessions();
+            renderThread([]);
+        });
+
+        renameChatButton.addEventListener('click', () => {
+            const active = getActiveChat();
+            if (!active) return;
+
+            const currentName = active.name || 'Chat';
+            const nextName = prompt('Rename chat:', currentName);
+            if (nextName === null) return;
+
+            const trimmed = nextName.trim();
+            if (!trimmed) {
+                showToast('Chat name cannot be empty.', 'warning');
+                return;
+            }
+
+            active.name = trimmed;
+            renderChatOptions();
+            saveChatSessions();
+        });
+
+        deleteChatButton.addEventListener('click', () => {
+            const active = getActiveChat();
+            if (!active) return;
+
+            if (chatSessions.length === 1) {
+                showToast('At least one chat is required.', 'warning');
+                return;
+            }
+
+            const shouldDelete = confirm(`Delete "${active.name}"?`);
+            if (!shouldDelete) return;
+
+            const index = chatSessions.findIndex((item) => item.id === active.id);
+            if (index === -1) return;
+
+            chatSessions.splice(index, 1);
+            const nextIndex = Math.max(0, index - 1);
+            activeChatId = chatSessions[nextIndex].id;
+
+            renderChatOptions();
+            syncAgentForActiveChat();
+            saveChatSessions();
+            loadChatHistory(activeChatId);
+        });
+
+        agentSelect.addEventListener('change', () => {
+            const active = getActiveChat();
+            if (!active) return;
+            active.agent_id = agentSelect.value;
+            applyAgentUiState();
+            saveChatSessions();
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (activeAbortController) {
+                activeAbortController.abort();
+            }
+        });
+
+        promptInput.addEventListener('input', () => {
+            updateUrlIndicator();
+            updateCharCounter();
+        });
+        promptInput.addEventListener('paste', () => {
+            setTimeout(() => {
+                updateUrlIndicator();
+                updateCharCounter();
+            }, 10);
+        });
+        
+        promptInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                if (activeAbortController) {
+                    event.preventDefault();
+                    activeAbortController.abort();
+                }
+                return;
+            }
+
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                if (!generateBtn.disabled) {
+                    generate();
+                }
+            }
+        });
+
+        async function generate() {
+            const prompt = document.getElementById('prompt').value.trim();
+            
+            // Input validation
+            if (!prompt) {
+                showToast('Please enter a prompt', 'error');
+                return;
+            }
+            
+            if (prompt.length > 50000) {
+                showToast('Prompt too long (max 50,000 characters)', 'error');
+                return;
+            }
+            
+            // Sanitize dangerous patterns (basic client-side check)
+            if (prompt.includes('\x00')) {
+                showToast('Invalid characters detected', 'error');
+                return;
+            }
+            
+            const includeTest = includeTestInput.checked;
+            const agentId = document.getElementById('agent-id').value;
+            const btn = generateBtn;
+            const originalText = btn.innerText;
+
+            if (!activeChatId) {
+                const fallbackChat = createChat('Chat 1', agentId || defaultAgentId);
+                chatSessions.push(fallbackChat);
+                activeChatId = fallbackChat.id;
+                renderChatOptions();
+                saveChatSessions();
+            }
+
+            if (!prompt) {
+                showToast('Please enter a message first.', 'warning');
+                return;
+            }
+            
+            btn.innerText = "🧠 Thinking..."; btn.disabled = true;
+            setGeneratingState(true);
+            activeAbortController = new AbortController();
+            
+            const requestStartTime = performance.now();
+            startProcessingAnimation();
+            
+            try {
+                const res = await fetch('/api/generate/stream', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    signal: activeAbortController.signal,
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        include_test: includeTest,
+                        agent_id: agentId,
+                        chat_id: activeChatId,
+                        search_mode: searchModeInput.checked
+                    })
+                });
+                if (!res.ok) {
+                    const errorPayload = await res.json().catch(() => ({}));
+                    throw new Error(errorPayload.error || 'Request failed');
+                }
+
+                document.getElementById('result-main').classList.remove('hidden');
+                document.getElementById('code-output').innerText = '';
+                mainCode = '';
+                let finalData = null;
+                let streamedAllowCodeOutput = false;
+
+                await parseSseResponse(res, (event) => {
+                    if (event.type === 'meta') {
+                        const codeMode = !!event.payload?.allow_code_output;
+                        streamedAllowCodeOutput = codeMode;
+                        resultMainTitle.innerText = codeMode ? '✅ Generated Code' : '💬 Assistant Reply';
+                        if (event.payload?.search_used) {
+                            const source = event.payload?.search_source || 'global search';
+                            showToast(`Search Mode used ${source} for this reply.`, 'info');
+                        }
+                        if (event.payload?.urls_processed && event.payload.urls_processed.length > 0) {
+                            const urlCount = event.payload.urls_processed.length;
+                            const successful = event.payload.urls_processed.filter(u => u.success);
+                            const failed = event.payload.urls_processed.filter(u => !u.success);
+                            
+                            if (successful.length > 0) {
+                                const urlTitles = successful.map(u => u.title).join(', ');
+                                showToast(`✅ Fetched & extracted content from ${successful.length} URL(s): ${urlTitles}`, 'info', 6000);
+                            }
+                            
+                            if (failed.length > 0) {
+                                const failedUrls = failed.map(u => u.url).join(', ');
+                                showToast(`⚠️ Failed to fetch ${failed.length} URL(s): ${failedUrls}`, 'warning', 5000);
+                            }
+                        }
+                    }
+                    if (event.type === 'chunk') {
+                        mainCode += event.delta || '';
+                        document.getElementById('code-output').innerText = mainCode;
+                    }
+                    if (event.type === 'done') {
+                        finalData = event.payload;
+                    }
+                });
+
+                if (!finalData) {
+                    if (activeAbortController && activeAbortController.signal.aborted) {
+                        showToast('Generation stopped.', 'info');
+                        return;
+                    }
+
+                    if ((mainCode || '').trim()) {
+                        finalData = {
+                            code: mainCode,
+                            allow_code_output: streamedAllowCodeOutput,
+                            test_code: null,
+                            turn: null
+                        };
+                        showToast('Stream ended early. Recovered from partial response.', 'warning');
+                    } else {
+                        throw new Error('No final response received');
+                    }
+                }
+
+                const data = finalData;
+                mainCode = data.code || mainCode;
+                document.getElementById('code-output').innerText = mainCode;
+                document.getElementById('result-main').classList.remove('hidden');
+                
+                // Render Test Code
+                if(data.allow_code_output && includeTest && data.test_code) {
+                    testCode = data.test_code;
+                    document.getElementById('test-output').innerText = data.test_code;
+                    document.getElementById('result-test').classList.remove('hidden');
+                } else {
+                    document.getElementById('result-test').classList.add('hidden');
+                }
+                if (data.turn) {
+                    appendTurn(data.turn);
+                } else {
+                    loadChatHistory(activeChatId);
+                }
+                
+                const requestEndTime = performance.now();
+                const duration = (requestEndTime - requestStartTime) / 1000;
+                updateResponseTime(duration);
+                
+                loadDbStatus();
+                if (ollamaMonitor && ollamaMonitor.style.display !== 'none') {
+                    loadOllamaStatus();
+                }
+                document.getElementById('prompt').value = '';
+                
+            } catch(e) {
+                if (activeAbortController && activeAbortController.signal.aborted) {
+                    showToast('Generation stopped.', 'info');
+                    return;
+                }
+                showToast("Error: " + (e?.message || e), 'error', 4200);
+            }
+            finally {
+                activeAbortController = null;
+                setGeneratingState(false);
+                stopProcessingAnimation();
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function downloadCode(type) {
+            const code = type === 'main' ? mainCode : testCode;
+            const name = type === 'main' ? 'generated_code.py' : 'test_generated_code.py';
+            const blob = new Blob([code], {type: 'text/plain'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            a.click();
+        }
+    </script>
+    
+    <!-- Agent Personality Editor Modal -->
+    <div id="agent-editor-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" style="display:none;">
+        <div class="clay p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="editor-modal-title" class="text-xl font-bold theme-accent">✏️ Edit Agent Personality</h2>
+                <button id="close-editor-btn" class="clay-button px-3 py-1 text-sm">✕ Close</button>
+            </div>
+            
+            <div id="editor-select-wrapper" class="mb-4">
+                <label class="block text-sm font-semibold theme-text mb-1">Select Agent</label>
+                <select id="editor-agent-select" class="clay-button px-3 py-2 w-full text-sm">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            
+            <div id="editor-id-wrapper" class="mb-4" style="display:none;">
+                <label class="block text-sm font-semibold theme-text mb-1">Agent ID <span class="text-red-500">*</span></label>
+                <input type="text" id="editor-agent-id" class="clay-inset px-3 py-2 w-full theme-text text-sm" placeholder="unique_id_no_spaces" maxlength="50" pattern="[a-z0-9_-]+">
+                <span class="text-xs theme-muted">Lowercase letters, numbers, underscore, hyphen only. Cannot be changed later.</span>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold theme-text mb-1">Agent Name</label>
+                <input type="text" id="editor-agent-name" class="clay-inset px-3 py-2 w-full theme-text text-sm" placeholder="Agent Name" maxlength="100">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold theme-text mb-1">Description</label>
+                <input type="text" id="editor-agent-desc" class="clay-inset px-3 py-2 w-full theme-text text-sm" placeholder="Brief description" maxlength="500">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold theme-text mb-1">System Prompt (Personality)</label>
+                <textarea id="editor-agent-prompt" class="clay-inset px-3 py-2 w-full theme-text text-sm h-48" placeholder="Define how the agent should respond..." maxlength="5000"></textarea>
+                <div class="flex justify-between items-center mt-1">
+                    <span id="prompt-char-counter" class="text-xs theme-muted">0 / 5,000</span>
+                    <span class="text-xs theme-muted">Tip: Be specific about tone, style, and behavior</span>
+                </div>
+            </div>
+            
+            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs theme-text">
+                <strong>💡 Tips:</strong>
+                <ul class="list-disc ml-4 mt-1">
+                    <li>Be direct: "Keep responses under 50 words"</li>
+                    <li>Set tone: "Be friendly and casual" or "Be formal and technical"</li>
+                    <li>Control code: "Only generate code when explicitly asked"</li>
+                    <li>Add constraints: "Don't apologize" or "Be concise"</li>
+                </ul>
+            </div>
+            
+            <div class="flex gap-2 justify-between">
+                <button id="delete-agent-btn" class="clay-button px-4 py-2 text-sm text-red-600" style="display:none;">🗑️ Delete Agent</button>
+                <div class="flex gap-2">
+                    <button id="cancel-agent-btn" class="clay-button px-4 py-2 text-sm">Cancel</button>
+                    <button id="save-agent-btn" class="clay-button px-6 py-2 font-bold text-sm">💾 Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Agent Editor functionality
+        const agentEditorModal = document.getElementById('agent-editor-modal');
+        const editAgentBtn = document.getElementById('edit-agent-btn');
+        const addAgentBtn = document.getElementById('add-agent-btn');
+        const closeEditorBtn = document.getElementById('close-editor-btn');
+        const cancelAgentBtn = document.getElementById('cancel-agent-btn');
+        const saveAgentBtn = document.getElementById('save-agent-btn');
+        const deleteAgentBtn = document.getElementById('delete-agent-btn');
+        const editorModalTitle = document.getElementById('editor-modal-title');
+        const editorSelectWrapper = document.getElementById('editor-select-wrapper');
+        const editorIdWrapper = document.getElementById('editor-id-wrapper');
+        const editorAgentSelect = document.getElementById('editor-agent-select');
+        const editorAgentId = document.getElementById('editor-agent-id');
+        const editorAgentName = document.getElementById('editor-agent-name');
+        const editorAgentDesc = document.getElementById('editor-agent-desc');
+        const editorAgentPrompt = document.getElementById('editor-agent-prompt');
+        const promptCharCounter = document.getElementById('prompt-char-counter');
+        
+        let allAgents = [];
+        let editorMode = 'edit'; // 'edit' or 'create'
+        
+        async function loadAgentsForEditor() {
+            try {
+                const response = await fetch('/api/agents');
+                const data = await response.json();
+                allAgents = data.agents || [];
+                
+                editorAgentSelect.innerHTML = '';
+                allAgents.forEach(agent => {
+                    const option = document.createElement('option');
+                    option.value = agent.id;
+                    option.textContent = agent.name;
+                    editorAgentSelect.appendChild(option);
+                });
+                
+                // Load first agent
+                if (allAgents.length > 0) {
+                    loadAgentToEditor(allAgents[0].id);
+                }
+            } catch (err) {
+                showToast('Failed to load agents: ' + err.message, 'error');
+            }
+        }
+        
+        function loadAgentToEditor(agentId) {
+            const agent = allAgents.find(a => a.id === agentId);
+            if (!agent) return;
+            
+            editorAgentName.value = agent.name || '';
+            editorAgentDesc.value = agent.description || '';
+            editorAgentPrompt.value = agent.system_prompt || '';
+            updatePromptCharCounter();
+        }
+        
+        function updatePromptCharCounter() {
+            const length = editorAgentPrompt.value.length;
+            promptCharCounter.textContent = `${length.toLocaleString()} / 5,000`;
+            
+            if (length > 4500) {
+                promptCharCounter.className = 'text-xs text-red-600 font-semibold';
+            } else if (length > 4000) {
+                promptCharCounter.className = 'text-xs text-orange-600';
+            } else {
+                promptCharCounter.className = 'text-xs theme-muted';
+            }
+        }
+        
+        async function saveAgentChanges() {
+            const name = editorAgentName.value.trim();
+            const description = editorAgentDesc.value.trim();
+            const systemPrompt = editorAgentPrompt.value.trim();
+            
+            if (!name || !systemPrompt) {
+                showToast('Name and System Prompt are required', 'error');
+                return;
+            }
+            
+            try {
+                saveAgentBtn.disabled = true;
+                saveAgentBtn.textContent = '💾 Saving...';
+                
+                let response;
+                
+                if (editorMode === 'create') {
+                    const agentId = editorAgentId.value.trim();
+                    if (!agentId) {
+                        showToast('Agent ID is required', 'error');
+                        saveAgentBtn.disabled = false;
+                        saveAgentBtn.textContent = '💾 Save Changes';
+                        return;
+                    }
+                    
+                    // Validate ID format
+                    if (!/^[a-z0-9_-]+$/.test(agentId)) {
+                        showToast('Agent ID can only contain lowercase letters, numbers, underscore, and hyphen', 'error');
+                        saveAgentBtn.disabled = false;
+                        saveAgentBtn.textContent = '💾 Save Changes';
+                        return;
+                    }
+                    
+                    response = await fetch('/api/agents', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            id: agentId,
+                            name: name,
+                            description: description,
+                            mode: 'contextual',
+                            system_prompt: systemPrompt
+                        })
+                    });
+                } else {
+                    const agentId = editorAgentSelect.value;
+                    response = await fetch(`/api/agents/${agentId}`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            name: name,
+                            description: description,
+                            system_prompt: systemPrompt
+                        })
+                    });
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(editorMode === 'create' ? '✅ Agent created!' : '✅ Agent updated!', 'info', 2000);
+                    agentEditorModal.style.display = 'none';
+                    location.reload();
+                } else {
+                    showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (err) {
+                showToast('Error saving: ' + err.message, 'error');
+            } finally {
+                saveAgentBtn.disabled = false;
+                saveAgentBtn.textContent = '💾 Save Changes';
+            }
+        }
+        
+        async function deleteAgent() {
+            const agentId = editorAgentSelect.value;
+            const agent = allAgents.find(a => a.id === agentId);
+            
+            if (!confirm(`Delete "${agent?.name || agentId}"?\n\nThis cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                deleteAgentBtn.disabled = true;
+                deleteAgentBtn.textContent = '🗑️ Deleting...';
+                
+                const response = await fetch(`/api/agents/${agentId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('🗑️ Agent deleted', 'info', 2000);
+                    agentEditorModal.style.display = 'none';
+                    location.reload();
+                } else {
+                    showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (err) {
+                showToast('Error deleting: ' + err.message, 'error');
+            } finally {
+                deleteAgentBtn.disabled = false;
+                deleteAgentBtn.textContent = '🗑️ Delete Agent';
+            }
+        }
+        
+        editAgentBtn.addEventListener('click', () => {
+            editorMode = 'edit';
+            editorModalTitle.textContent = '✏️ Edit Agent Personality';
+            editorSelectWrapper.style.display = 'block';
+            editorIdWrapper.style.display = 'none';
+            deleteAgentBtn.style.display = 'block';
+            loadAgentsForEditor();
+            agentEditorModal.style.display = 'flex';
+        });
+        
+        addAgentBtn.addEventListener('click', () => {
+            editorMode = 'create';
+            editorModalTitle.textContent = '➕ Create New Agent';
+            editorSelectWrapper.style.display = 'none';
+            editorIdWrapper.style.display = 'block';
+            deleteAgentBtn.style.display = 'none';
+            
+            // Clear form
+            editorAgentId.value = '';
+            editorAgentName.value = '';
+            editorAgentDesc.value = '';
+            editorAgentPrompt.value = 'You are a helpful AI assistant. Be conversational and friendly.';
+            updatePromptCharCounter();
+            
+            agentEditorModal.style.display = 'flex';
+        });
+        
+        closeEditorBtn.addEventListener('click', () => {
+            agentEditorModal.style.display = 'none';
+        });
+        
+        cancelAgentBtn.addEventListener('click', () => {
+            agentEditorModal.style.display = 'none';
+        });
+        
+        agentEditorModal.addEventListener('click', (e) => {
+            if (e.target === agentEditorModal) {
+                agentEditorModal.style.display = 'none';
+            }
+        });
+        
+        editorAgentSelect.addEventListener('change', (e) => {
+            loadAgentToEditor(e.target.value);
+        });
+        
+        editorAgentPrompt.addEventListener('input', updatePromptCharCounter);
+        
+        saveAgentBtn.addEventListener('click', saveAgentChanges);
+        deleteAgentBtn.addEventListener('click', deleteAgent);
+    </script>
+</body>
+</html>

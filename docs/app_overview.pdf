@@ -1,0 +1,86 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 1595 >>
+stream
+BT
+/F1 12 Tf
+72 770 Td
+(AI Coding Assistant - Product Context) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(Purpose:) Tj
+0 -16 Td
+(This application provides multi-chat AI assistance with selectable agent modes.) Tj
+0 -16 Td
+(It supports conversation-first and code-first behavior, plus persistent chat threads.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(Core Capabilities:) Tj
+0 -16 Td
+(1\) Multi-chat thread management with create, rename, delete, and per-chat agent selection.) Tj
+0 -16 Td
+(2\) Agent profiles \(contextual, code-first, conversation, review\) loaded from agents.json.) Tj
+0 -16 Td
+(3\) Mode-aware behavior: coding output only when code mode or explicit code intent is active.) Tj
+0 -16 Td
+(4\) Conversation memory persisted in SQLite by chat_id with user/assistant turn history.) Tj
+0 -16 Td
+(5\) Theme modes in UI: clay, liquid, glass, skeuomorphic.) Tj
+0 -16 Td
+(6\) Optional test generation in code-first mode.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(Technical Flow:) Tj
+0 -16 Td
+(User sends prompt with chat_id and agent_id -> backend resolves mode -> LLM response generated) Tj
+0 -16 Td
+(-> turn is stored in persistent chat store -> UI thread renders full conversation history.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(Design Intent:) Tj
+0 -16 Td
+(Behave like modern AI chat products with back-and-forth continuity, not one-shot generation.) Tj
+0 -16 Td
+(Conversation quality and context continuity are primary goals.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(Constraints:) Tj
+0 -16 Td
+(- Keep UX simple and fast.) Tj
+0 -16 Td
+(- Respect selected agent mode strictly.) Tj
+0 -16 Td
+(- Avoid forced code generation in non-code modes.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1958
+%%EOF

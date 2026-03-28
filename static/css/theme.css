@@ -1,0 +1,137 @@
+body {
+    --bg: linear-gradient(145deg, #dbe4f0, #eaf0f8);
+    --text: #1e293b;
+    --muted: #475569;
+    --accent: #0f766e;
+    --surface: #dfe8f5;
+    --surface-alt: #e4ecf7;
+    --surface-border: rgba(255, 255, 255, 0.55);
+    --elev: 12px 12px 24px rgba(148, 163, 184, 0.35), -10px -10px 20px rgba(255, 255, 255, 0.8);
+    --inset: inset 5px 5px 10px rgba(148, 163, 184, 0.28), inset -5px -5px 10px rgba(255, 255, 255, 0.85);
+    --btn-elev: 7px 7px 16px rgba(148, 163, 184, 0.35), -6px -6px 14px rgba(255, 255, 255, 0.85);
+    --btn-active: inset 4px 4px 8px rgba(148, 163, 184, 0.35), inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: 0.01em;
+}
+
+h1, h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    letter-spacing: 0.02em;
+}
+
+textarea,
+button,
+select,
+label,
+span,
+p,
+code,
+pre {
+    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+}
+
+body[data-theme="liquid"] {
+    --bg: radial-gradient(circle at 15% 20%, #dbeafe 0%, #c7d2fe 35%, #bfdbfe 65%, #d9f3ff 100%);
+    --text: #0f172a;
+    --muted: #334155;
+    --accent: #0369a1;
+    --surface: rgba(219, 234, 254, 0.65);
+    --surface-alt: rgba(224, 242, 254, 0.75);
+    --surface-border: rgba(255, 255, 255, 0.7);
+    --elev: 0 18px 35px rgba(14, 116, 144, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    --inset: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -8px 16px rgba(14, 116, 144, 0.12);
+    --btn-elev: 0 10px 22px rgba(14, 116, 144, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    --btn-active: inset 0 6px 12px rgba(14, 116, 144, 0.2);
+}
+
+body[data-theme="glass"] {
+    --bg: linear-gradient(135deg, #0f172a, #1e293b 45%, #334155);
+    --text: #e2e8f0;
+    --muted: #cbd5e1;
+    --accent: #67e8f9;
+    --surface: rgba(148, 163, 184, 0.16);
+    --surface-alt: rgba(148, 163, 184, 0.2);
+    --surface-border: rgba(255, 255, 255, 0.24);
+    --elev: 0 18px 35px rgba(2, 6, 23, 0.35);
+    --inset: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    --btn-elev: 0 10px 20px rgba(2, 6, 23, 0.35);
+    --btn-active: inset 0 6px 10px rgba(2, 6, 23, 0.28);
+}
+
+body[data-theme="skeuomorphic"] {
+    --bg: linear-gradient(180deg, #f8f1e1, #efe2c4);
+    --text: #3f3020;
+    --muted: #6a553a;
+    --accent: #8b5e34;
+    --surface: linear-gradient(180deg, #f3e5c8, #e9d7b4);
+    --surface-alt: linear-gradient(180deg, #f8ebd0, #e7d3ac);
+    --surface-border: rgba(159, 122, 79, 0.35);
+    --elev: 0 12px 18px rgba(121, 85, 43, 0.28), inset 0 1px 0 rgba(255, 250, 240, 0.85);
+    --inset: inset 0 2px 4px rgba(121, 85, 43, 0.2), inset 0 -1px 0 rgba(255, 250, 240, 0.85);
+    --btn-elev: 0 8px 14px rgba(121, 85, 43, 0.28), inset 0 1px 0 rgba(255, 250, 240, 0.85);
+    --btn-active: inset 0 4px 8px rgba(121, 85, 43, 0.24);
+}
+
+.clay {
+    background: var(--surface);
+    border-radius: 1.5rem;
+    box-shadow: var(--elev);
+    border: 1px solid var(--surface-border);
+    color: var(--text);
+    backdrop-filter: blur(10px);
+}
+
+.clay-inset {
+    background: var(--surface-alt);
+    border-radius: 1rem;
+    box-shadow: var(--inset);
+    border: 1px solid var(--surface-border);
+    color: var(--text);
+    backdrop-filter: blur(8px);
+}
+
+.clay-button {
+    background: var(--surface);
+    border-radius: 0.9rem;
+    box-shadow: var(--btn-elev);
+    border: 1px solid var(--surface-border);
+    transition: all 0.2s ease;
+    color: var(--text);
+}
+
+.clay-button:hover {
+    transform: translateY(-1px);
+}
+
+.clay-button:active {
+    box-shadow: var(--btn-active);
+    transform: translateY(0);
+}
+
+.theme-text { color: var(--text); }
+.theme-muted { color: var(--muted); }
+.theme-accent { color: var(--accent); }
+
+#conversation-thread .clay,
+#conversation-thread .clay-button {
+    line-height: 1.55;
+}
+
+.assistant-reply {
+    border-left: 4px solid var(--accent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--surface-alt) 86%, var(--accent) 14%), var(--surface-alt));
+}
+
+.typing-dots::after {
+    content: '...';
+    animation: typingDots 1.2s steps(4, end) infinite;
+}
+
+@keyframes typingDots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+}
